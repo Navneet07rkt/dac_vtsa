@@ -222,3 +222,4 @@ Details and the reasons behind each choice: MODEL.md §9.
   velocity-dependent dispersion coefficient evaluated with the pressure-driven face velocity
   makes the discrete system unstable; a blended valve stream is anti-dissipative near zero
   flow; step-size control must respect Newton, not only the error estimate.
+# dad_vtsa
