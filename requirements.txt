@@ -1,0 +1,6 @@
+numpy>=1.24
+scipy>=1.12        # gmres(rtol=..., atol=...) keyword API
+pyyaml>=6.0
+matplotlib>=3.7
+pytest>=7          # tests only
+# optional: CoolProp>=6.6   (properties.backend: coolprop)

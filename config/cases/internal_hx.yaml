@@ -1,0 +1,14 @@
+# The 10 cm flat bed of young2021_flat_bed_rim_jacket.yaml, but with an embedded heat
+# exchanger (tubes/fins in the bed) that follows the jacket temperature.
+# hA_per_volume = 2000 W/m3/K is an ASSUMED design value (order of a finned-tube
+# exchanger with ~200 m2/m3 and h ~ 10 W/m2/K), not a literature parameter --
+# treat it as a design variable and scan it (python run_sensitivity.py).
+run:
+  name: internal_hx
+geometry:
+  bed_length: 0.01
+  bed_radius: 0.05
+internal_hx:
+  enabled: true
+  hA_per_volume: 2000.0
+  follows_jacket: true

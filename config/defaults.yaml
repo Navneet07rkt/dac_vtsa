@@ -1,0 +1,266 @@
+# =============================================================================
+#  dac_vtsa — default parameters (numbers only; validation lives in schema.py)
+#  SI units everywhere: m, s, K, Pa, mol, kg, J, W.
+#
+#  Primary source for sorbent, feed and cycle (unless stated otherwise):
+#   [Y21]  Young, García-Díez, Garcia, van der Spek (2021) Energy Environ. Sci.
+#          14, 5377-5394, doi:10.1039/D1EE01272J  (+ ESI Tables S5, S9, S10)
+#   [G25]  Galanti et al. (2025/26) "Purity-constrained TVSA modeling of
+#          Lewatit VP OC 1065 for DAC", RSC Energy Advances, doi:10.1039/D5YA00336A
+#          (SI Tables S7/S8: wall + heat-transfer data, correlations)
+#   [ER68] Edwards & Richardson (1968) Chem. Eng. Sci. 23, 109 (dispersion)
+#   [ZS70] Zehner & Schlünder (1970) Chem. Ing. Tech. 42, 933 (bed conductivity)
+#   [MN93] Martin & Nilles (1993) Chem. Ing. Tech. 65, 1468 (wall heat transfer)
+#  Every key is documented (unit, range, source) in PARAMETERS.md, which is
+#  generated from config/schema.py.
+# =============================================================================
+
+run:
+  name: default_3d               # results/<name>/
+  results_dir: results
+  max_cycles: 12                 # hard cap on cycles
+  min_cycles: 2
+  css_tolerance: 1.0e-3          # max normalised change of end-of-cycle state
+  css_mb_tolerance: 5.0e-3       # cycle CO2 balance (feed vs product+losses), [Y21] uses 0.5 %
+  handoff_via_csv: true          # each step reads the previous step's state CSV
+  snapshots_per_step: 12         # field snapshots per step -> q,T,P(r,theta,z,t)
+  write_fields_every_cycle: false
+  initial_state: clean           # clean | feed_equilibrium | csv
+  initial_state_csv: null
+  make_plots: true
+
+components:
+  water: true                    # humid air (CO2/H2O/N2). false -> dry CO2/N2 model
+
+geometry:                        # flat bed: L = 1 cm as [Y21] ESI Table S9, but d = 5 cm (not 10 cm), because
+  bed_length: 0.01               # with only a RIM jacket a 10 cm disc is conduction-limited (lambda_bed ~0.15
+  bed_radius: 0.025              # W/m/K -> centre lags the wall by tens of K): cases/young2021_flat_bed_rim_jacket.yaml
+  wall_thickness: 0.002          # assumption (2 mm stainless steel lab shell)
+
+grid:
+  Nr: 8
+  Ntheta: 8
+  Nz: 12
+  radial_spacing: uniform        # uniform | equal_area
+
+sorbent:                         # Lewatit VP OC 1065
+  name: Lewatit VP OC 1065
+  particle_diameter: 5.2e-4      # [Y21] R_p = 0.26 mm
+  particle_density: 880.0        # [Y21] pellet density
+  bed_voidage: 0.40              # [Y21] eps_b
+  total_voidage: 0.54            # [Y21] eps_t = eps_b + eps_p (1-eps_b)
+  cp_solid: 1580.0               # [Y21] J/kg/K
+  particle_conductivity: 0.16    # W/m/K, Zhang et al. 2025 Energy 334:137733 Table 1 (G25 SI uses 0.43)
+  max_temperature: 393.15        # warning threshold (oxidative/thermal stability)
+
+isotherm:
+  co2:                           # temperature-dependent Toth, [Y21] Table 2
+    q_inf0: 4.86                 # mol/kg
+    chi: 0.0
+    b0: 2.85e-21                 # 1/Pa ;  b = b0 exp(-dH0/RT)
+    dH0: -117798.0               # J/mol
+    tau0: 0.209
+    alpha: 0.523
+    T0: 298.15
+    p_regularization: 0.01       # Pa, q* -> q* p/(p+p_reg): caps the trace-level slope (see isotherms.py)
+  h2o:                           # GAB with Anderson T-dependence, [Y21] Table 3
+    q_m: 3.63                    # mol/kg
+    C: 47110.0                   # E1 = C - exp(D T)        [J/mol]
+    D: 0.023744                  # 1/K
+    F: 57706.0                   # E2-9 = F + G T           [J/mol]
+    G: -47.814                   # J/mol/K
+    E10_slope: -44.38            # E10+ = slope*T + intercept [Y21] eq. 8
+    E10_intercept: 57220.0
+    rh_cap: 0.97                 # numerical cap on RH fed to GAB (no condensation model)
+  coadsorption:
+    model: wadst                 # none | wadst | mechanistic | stampi_bombelli
+    water_loading_basis: state   # state (local q_H2O) | equilibrium (q*_H2O)
+    wadst:                       # [Y21] Table 4
+      b0_wet: 1.230e-18
+      q_inf0_wet: 9.035
+      tau0_wet: 0.053
+      chi_wet: 0.0
+      alpha_wet: 0.053
+      dH_wet: -203687.0
+      A: 1.532
+    mechanistic:                 # [Y21] Table 4 (b evaluated with dH_ave, see MODEL.md)
+      f_blocked_max: 0.433
+      k: 0.795
+      phi_dry: 1.0
+      A: 1.535
+      dH_wet: -130155.0
+      n: 1.425
+    stampi_bombelli:             # [Y21] Table 4 refit of Stampi-Bombelli et al. 2020
+      gamma: -0.137
+      beta: 5.612
+
+kinetics:                        # linear driving force, k(T) = k_ref exp(-Ea/R (1/T - 1/T_ref))
+  k_ldf_co2: 0.003               # 1/s  [Y21] ESI Table S9 (fitted to breakthroughs)
+  k_ldf_h2o: 0.0086              # 1/s  [Y21]
+  Ea_co2: 0.0                    # J/mol (0 = temperature independent, as in [Y21])
+  Ea_h2o: 0.0
+  T_ref: 298.15
+
+thermo:
+  dH_ads_co2: -70000.0           # J/mol  [Y21] (Clausius-Clapeyron average)
+  dH_ads_h2o: -46000.0           # J/mol  [Y21]
+  cp_ads_co2: 37.1               # J/mol/K adsorbed phase (gas-like)
+  cp_ads_h2o: 75.3               # J/mol/K adsorbed water (liquid-like) -> Kirchhoff dH(T)
+  T_ref: 298.15                  # reference T of enthalpies and of dH_ads
+
+properties:
+  backend: ideal_gas             # ideal_gas | coolprop
+  cp_reference_T: 330.0          # K, constant gas cp used in the energy balance
+
+transport:
+  dispersion_model: edwards_richardson   # edwards_richardson | young2021 | wakao_kagei
+  er_gamma1: 0.73                # [ER68]
+  er_gamma2: 0.5
+  er_beta: 13.0
+  Pe_mass_radial_inf: 10.0       # transverse mass dispersion D_T = g1 Dm + v dp / Pe
+  Pe_heat_radial_inf: 10.0       # [G25] Pe_inf = 10 (8-12)
+  Pe_heat_axial_inf: 2.0         # axial thermal dispersion (Yagi-Kunii)
+  bed_conductivity_model: zehner_schlunder   # zehner_schlunder | parallel (Zhang 2025 eq.7) | constant
+  bed_conductivity_constant: 0.12            # W/m/K if model == constant
+  zs_shape_factor: 1.25          # spheres
+  wall_htc_model: martin_nilles  # martin_nilles | constant   ([G25] SI)
+  wall_htc_constant: 300.0       # W/m2/K if model == constant
+  ergun_A: 150.0
+  ergun_B: 1.75
+  heat_transfer_mode: resolved   # resolved (2D/3D conduction) | lumped (1D-style U)
+  lumped_U: 14.0                 # W/m2/K, only for heat_transfer_mode == lumped ([Y21] h_j)
+
+wall:
+  enabled: true
+  density: 7800.0                # [G25] SI Table S8 (steel)
+  cp: 513.0                      # [G25]
+  conductivity: 16.0             # [G25]
+
+jacket:
+  h_jacket: 26.0                 # W/m2/K wall-to-jacket, [G25] SI Table S8 (h_ext)
+  theta_coverage_deg: [0.0, 360.0]   # angular extent of the jacket
+  z_coverage: [0.0, 1.0]         # axial extent (fractions of L)
+  h_ambient: 5.0                 # W/m2/K uncovered wall -> ambient (natural convection)
+  ramp_time: 0.0                 # s, first-order lag of jacket fluid T (0 = step change)
+
+internal_hx:                     # optional embedded heat exchanger (volumetric)
+  enabled: false
+  hA_per_volume: 2000.0          # W/m3/K
+  follows_jacket: true
+
+feed:
+  T: 288.15                      # [Y21]
+  P: 101325.0
+  RH: 0.55                       # [Y21]
+  y_co2_dry: 4.0e-4              # [Y21]
+  velocity: 0.0706               # m/s superficial at feed T,P  [Y21] (90 % of u_mf)
+  profile: uniform               # uniform | cosine_theta | linear_r | central_disc | sector
+  profile_amplitude: 0.0         # cosine_theta / linear_r: e.g. 0.3 -> +/-30 %
+  profile_theta0_deg: 0.0        # cosine_theta / sector: direction of max flow
+  profile_radius_fraction: 0.5   # central_disc: inlet radius / R
+  profile_sector_deg: 90.0       # sector: angular width of the inlet
+
+ambient:
+  T: 288.15
+  P: 101325.0
+  RH: 0.55
+  y_co2_dry: 4.0e-4
+
+operation:
+  P_vacuum: 2.0e4                # Pa  [Y21]
+  T_heat: 373.15                 # K   [Y21] (sorbent limit ~100 C)
+  T_cool: 288.15                 # K   [Y21]
+  T_adsorption_jacket: 288.15    # K   [Y21] (= feed T)
+  vent_model: valve              # valve (finite conductance, default) | ramp (Dirichlet P ramp, stiff)
+  vent_conductance: 500.0        # m/s, k_v of atmospheric vents / feed header (N = k_v dP/RT per unit area)
+  valve_time_constant: 5.0       # s, opening time of vents/headers (reservoir P ramps from bed P)
+  vacuum_model: pump             # pump (finite speed, default) | ramp (Dirichlet P ramp, stiff)
+  pump_speed_per_area: 5.0e-3    # m/s = pump speed S [m3/s] / bed cross-section (5e-3 -> 0.035 m3/h for d = 5 cm)
+  vacuum_check_valve: true       # no back-flow from the vacuum line
+
+ports:                           # V1 inlet, V2 bottom outlet, V3 product outlet
+  V1: top
+  V2: bottom
+  V3: bottom                     # [Y21] evacuates/desorbs at z = L
+
+cycle:                           # ordered; type in adsorption|blowdown|heating|cooling|pressurization
+  - name: adsorption
+    type: adsorption
+    duration: 8000.0             # [Y21] t_ads
+    valves: {V1: OPEN, V2: OPEN_ATMOSPHERIC, V3: CLOSED}
+    jacket: {mode: temperature, T: operation.T_adsorption_jacket}
+  - name: blowdown
+    type: blowdown
+    duration: 60.0               # [Y21] t_vac
+    valves: {V1: CLOSED, V2: OPEN_VACUUM, V3: CLOSED}
+    jacket: {mode: temperature, T: operation.T_adsorption_jacket}
+  - name: heating
+    type: heating
+    duration: 22400.0            # [Y21] t_heat + t_des = 2400 + 20000
+    valves: {V1: CLOSED, V2: CLOSED, V3: OPEN_VACUUM}
+    jacket: {mode: temperature, T: operation.T_heat}
+  - name: cooling
+    type: cooling
+    duration: 400.0              # [Y21] t_cool
+    valves: {V1: CLOSED, V2: CLOSED, V3: CLOSED}
+    jacket: {mode: temperature, T: operation.T_cool}
+
+energy:
+  eta_vacuum: 0.7                # [Y21]
+  vacuum_efficiency_model: constant   # constant | krishnamurthy (pressure dependent, used in [G25])
+  eta_blower: 0.5                # [Y21]
+  gamma_gas: 1.4                 # [Y21]
+  pump_handles_water: false      # assumption: water condensed before/early in compression, pump work on dry gas.
+                                 # [Y21] only say water is 'condensed out in the compression process'; with true
+                                 # the Young case gives 1.13 MJ/kg electric vs 0.42 (false) vs 0.80 published
+  eta_turbine: 0.75              # [Y21] work-equivalent of heat
+  T_low_equiv: 288.15            # [Y21] T_L (ambient)
+
+solver:
+  method: trbdf2                 # trbdf2 = own implicit Newton integrator (default) | scipy_bdf | rk4
+  scheme: sdirk2                 # sdirk2 (L-stable both stages, default) | trbdf2
+  rtol: 1.0e-4
+  atol_c_co2: 1.0e-6             # mol/m3 (~6e-5 of the feed CO2 concentration)
+  atol_c_h2o: 1.0e-5             # (~3e-5 of the feed H2O concentration)
+  atol_c_inert: 1.0e-4           # (~3e-6 of the feed N2 concentration)
+  atol_q: 1.0e-6                 # mol/kg
+  atol_T: 1.0e-3                 # K  (energy atol = rho_b cp_s * atol_T)
+  h_initial: 1.0e-4              # s
+  h_max_fraction: 0.02           # max step = fraction of step duration
+  max_newton_iter: 7
+  newton_mode: krylov            # krylov (Newton-Krylov, LU-preconditioned, default) | hybrid | modified
+  preconditioner: theta_block    # theta_block (sector-decoupled LU, ~5-10x cheaper in 3D) | full
+  precond_theta_rings: 3         # innermost rings kept fully theta-coupled in the theta_block preconditioner
+  refactor_ratio: 3.0            # re-factorise the Newton matrix when h changed by more than this factor
+  gmres_refresh: 20              # GMRES iterations in one step that trigger a Jacobian refresh
+  newton_kappa: 0.01
+  conservation_tol: 1.0e-3       # each stage must close the global species/energy balance to this (x tolerance inventory)
+  jacobian_max_age: 40           # steps
+  limiter: van_albada            # van_albada | van_leer | minmod | upwind
+  max_steps_per_step: 200000
+  outlet_record_every: 1         # record outlet data every n accepted steps
+
+sensitivity:
+  relative_step: 0.10            # +/-10 % perturbation (central difference)
+  cycles: 6                      # cycles per perturbed run (or CSS if reached first)
+  grid: {Nr: 6, Ntheta: 1, Nz: 10}   # reduced (axisymmetric) grid for speed
+  processes: 2
+  parameters:
+    - kinetics.k_ldf_co2
+    - kinetics.k_ldf_h2o
+    - thermo.dH_ads_co2
+    - thermo.dH_ads_h2o
+    - sorbent.cp_solid
+    - sorbent.particle_conductivity
+    - jacket.h_jacket
+    - operation.T_heat
+    - operation.P_vacuum
+    - feed.velocity
+    - feed.RH
+  kpis:
+    - recovery_pct
+    - purity_dry_pct
+    - productivity_kg_m3_day
+    - specific_thermal_kJ_per_kg
+    - specific_electric_kJ_per_kg
+    - specific_total_kJ_per_kg

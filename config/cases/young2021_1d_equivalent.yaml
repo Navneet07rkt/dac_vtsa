@@ -1,0 +1,73 @@
+# =============================================================================
+# VALIDATION CASE -- reproduces the 1D model assumptions of Young et al. (2021)
+# EES 14:5377, ESI Tables S5/S9, WADST isotherm, operating point = the
+# minimum-work-equivalent optimum of Table S10 (WADST column):
+#   P_vac = 0.20 bar, T_heat = 99.73 C, end-of-column saturation 98.95 %,
+#   t_heat (pre-heat, vented) = 856 s, t_des (product) = 23033 s,
+#   t_vac = 60 s, t_cool = 400 s, t_press = 60 s.
+# Published KPIs at this point: purity 97.45 %, working capacity 1.00 mol/kg,
+#   specific heat 9.19 MJ/kg, mechanical work 0.80 MJ/kg, W_eq 2.37 MJ/kg,
+#   productivity 64.40 kg/m3/day.
+# 1D equivalence: one radial / angular cell, no wall heat capacity, jacket heat
+# U a (T_j - T) with U = 14 W/m2/K on the 2/R area (= Young's 4 h_j / d).
+# =============================================================================
+run:
+  name: young2021_1d_equivalent
+  max_cycles: 25
+  min_cycles: 3
+  css_tolerance: 2.0e-3
+  css_mb_tolerance: 5.0e-3
+  snapshots_per_step: 8
+geometry:                 # Young's flat bed (pinned: the lumped jacket area per volume is 2/R)
+  bed_length: 0.01
+  bed_radius: 0.05
+grid:
+  Nr: 1
+  Ntheta: 1
+  Nz: 30
+wall:
+  enabled: false
+transport:
+  heat_transfer_mode: lumped
+  lumped_U: 14.0
+  dispersion_model: young2021
+thermo:
+  cp_ads_co2: 37.1
+  cp_ads_h2o: 33.6
+jacket:
+  h_ambient: 0.0
+operation:
+  P_vacuum: 2.0e4
+  T_heat: 372.88
+cycle:
+  - name: vacuum
+    type: blowdown
+    duration: 60.0
+    valves: {V1: CLOSED, V2: OPEN_VACUUM, V3: CLOSED}
+    jacket: {mode: temperature, T: operation.T_adsorption_jacket}
+  - name: preheat
+    type: heating
+    duration: 856.0
+    valves: {V1: CLOSED, V2: OPEN_VACUUM, V3: CLOSED}
+    jacket: {mode: temperature, T: operation.T_heat}
+  - name: desorption
+    type: heating
+    duration: 23033.0
+    valves: {V1: CLOSED, V2: CLOSED, V3: OPEN_VACUUM}
+    jacket: {mode: temperature, T: operation.T_heat}
+  - name: cooling
+    type: cooling
+    duration: 400.0
+    valves: {V1: CLOSED, V2: CLOSED, V3: CLOSED}
+    jacket: {mode: temperature, T: operation.T_cool}
+  - name: pressurisation
+    type: pressurization
+    duration: 60.0
+    valves: {V1: OPEN_ATMOSPHERIC, V2: CLOSED, V3: CLOSED}
+    jacket: {mode: temperature, T: operation.T_adsorption_jacket}
+  - name: adsorption
+    type: adsorption
+    duration: 40000.0
+    valves: {V1: OPEN, V2: OPEN_ATMOSPHERIC, V3: CLOSED}
+    jacket: {mode: temperature, T: operation.T_adsorption_jacket}
+    stop_on: {criterion: end_saturation, value: 0.9895}

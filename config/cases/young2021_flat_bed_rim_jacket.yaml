@@ -1,0 +1,19 @@
+# Young et al. (2021) flat-bed geometry (L = 1 cm, d = 10 cm) heated ONLY through the rim
+# jacket, in full 3D.  Same sorbent, feed and cycle as the defaults.
+#
+# What it shows.  Young's 1D model spreads the jacket heat uniformly over the cross-section
+# (U * 4/d).  A real rim jacket must conduct it radially through the packed bed
+# (lambda ~ 0.15 W/m/K).  During desorption under vacuum the bed is a distributed heat
+# sink -- water and CO2 keep desorbing as the pump removes them -- of order
+# s ~ 7 kW/m3 here.  Steady conduction from the rim to the axis with a uniform sink gives
+#
+#       T_wall - T_axis ~ s R^2 / (4 lambda) ~ 30 K   for R = 5 cm   (~ 7 K for R = 2.5 cm)
+#
+# so the bed centre never approaches T_heat, desorbs little, and recovery and kJ/kg are far
+# worse than the 1D numbers.  That is why the default uses d = 5 cm; compare also
+# cases/internal_hx.yaml (same 10 cm bed with an embedded exchanger).
+run:
+  name: young2021_flat_bed_rim_jacket
+geometry:
+  bed_length: 0.01
+  bed_radius: 0.05

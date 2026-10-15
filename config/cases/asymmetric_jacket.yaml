@@ -1,0 +1,12 @@
+# A genuinely three-dimensional case: the jacket covers only half of the circumference
+# (theta = 0..180 deg) and the feed is maldistributed (+/-30 % with cos(theta)).
+# Temperature, loading and the CO2 front then depend on (r, theta, z) -- use
+# postprocessing/probe.py and the polar plots to look at it.
+run:
+  name: asymmetric_jacket
+jacket:
+  theta_coverage_deg: [0.0, 180.0]
+feed:
+  profile: cosine_theta
+  profile_amplitude: 0.3
+  profile_theta0_deg: 0.0

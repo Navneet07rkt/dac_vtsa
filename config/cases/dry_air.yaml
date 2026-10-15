@@ -1,0 +1,7 @@
+# Dry air (CO2/N2 only, dry Toth isotherm, no co-adsorption).  Useful to see how much of
+# the working capacity and of the heat duty comes from water: Lewatit co-adsorbs
+# ~1.9 kg H2O per kg CO2 in the humid default case.
+run:
+  name: dry_air
+components:
+  water: false
